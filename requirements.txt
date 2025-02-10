@@ -1,0 +1,5 @@
+aiogram~=3.17.0
+SQLAlchemy~=2.0.37
+asyncio~=3.4.3
+python-dotenv~=1.0.1
+aiosqlite
