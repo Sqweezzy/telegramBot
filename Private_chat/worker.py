@@ -4,8 +4,7 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from Common.client_inf import OrderService
-from Common.paginator import PaginationWorker, paginator_for_workers, PaginationOrders, paginator_for_finished, \
-    PaginationFinishedWorker, paginator, Pagination
+from Common.paginator import Pagination, get_keyboards
 from DataBase.orm_query import orm_get_all_awaitings, orm_update_awaiting, orm_get_awaitings_for_worker, \
     orm_finish_order, orm_get_finished_for_worker
 from Filters.chat_type import IsWorker, ChatTypeFilter
@@ -43,8 +42,9 @@ async def check_orders(callback: CallbackQuery, session: AsyncSession):
     try:
         await callback.message.edit_text(await OrderService(session, array[page].id_services, array[page].id_client, page)
                                          .get_description(),
-                                         reply_markup=await paginator_for_workers(
-                                             array=array, page=page, back='WorkerMenu_'))
+                                         reply_markup=
+                                         await get_keyboards(session=session, page=page, pref='ordersWRK',
+                                                             back='WorkerMenu_'))
     except IndexError:
         await callback.message.edit_text('Заказов пока нет.',
                                          reply_markup=get_inline_kb(
@@ -52,14 +52,15 @@ async def check_orders(callback: CallbackQuery, session: AsyncSession):
                                          ))
 
 
-@worker_router.callback_query(PaginationWorker.filter())
-async def pagination_check_orders(callback: CallbackQuery, callback_data: PaginationWorker, session: AsyncSession):
+@worker_router.callback_query(Pagination.filter(F.pref == 'ordersWRK'))
+async def pagination_check_orders(callback: CallbackQuery, callback_data: Pagination, session: AsyncSession):
     array = await orm_get_all_awaitings(session)
     page = callback_data.page
     await callback.message.edit_text(await OrderService(session,array[page].id_services, array[page].id_client, page)
                                      .get_description(),
-                                     reply_markup=await paginator_for_workers(
-                                         array=array, page=page, back='WorkerMenu_'))
+                                     reply_markup=
+                                     await get_keyboards(session=session, page=page, pref='ordersWRK',
+                                                         back='WorkerMenu_'))
 
 
 @worker_router.callback_query(F.data.startswith('takeOrder_'))
@@ -80,9 +81,9 @@ async def check_yours_orders(callback: CallbackQuery, session: AsyncSession):
         await callback.message.edit_text(await OrderService
         (session, your_orders[page].id_services, your_orders[page].id_client, page, id_worker=callback.from_user.id)
                                          .get_description_for_worker(),
-                                         reply_markup=await
-                                         paginator_for_workers
-                                         (array=your_orders,back='WorkerMenu_',page=page, id_worker=callback.from_user.id))
+                                         reply_markup=
+                                         await get_keyboards(session=session, pref='yourOrderWRK', page=page,
+                                                             id_worker=callback.from_user.id, back='WorkerMenu_'))
     except IndexError:
         await callback.message.edit_text('Заказов пока нет. Хотите посмотреть завершённые заказы?',
                                          reply_markup=get_inline_kb(
@@ -91,17 +92,16 @@ async def check_yours_orders(callback: CallbackQuery, session: AsyncSession):
         ))
 
 
-@worker_router.callback_query(PaginationOrders.filter())
-async def pagination_your_orders(callback: CallbackQuery, callback_data: PaginationOrders,session: AsyncSession):
+@worker_router.callback_query(Pagination.filter(F.pref == 'yourOrderWRK'))
+async def pagination_your_orders(callback: CallbackQuery, callback_data: Pagination,session: AsyncSession):
     your_orders = await orm_get_awaitings_for_worker(session, callback.from_user.id)
     page = callback_data.page
     await callback.message.edit_text(await OrderService
     (session, your_orders[page].id_services, your_orders[page].id_client, page, id_worker=callback.from_user.id)
                                      .get_description_for_worker(),
-                                     reply_markup=await
-                                     paginator_for_workers
-                                     (array=your_orders, back='WorkerMenu_', page=page,
-                                      id_worker=callback.from_user.id))
+                                     reply_markup=
+                                     await get_keyboards(session=session, pref='yourOrderWRK', page=page,
+                                                         id_worker=callback.from_user.id, back='WorkerMenu_'))
 
 
 @worker_router.callback_query(F.data.startswith('changeStatus_'))
@@ -120,21 +120,23 @@ async def finished_orders(callback: CallbackQuery, session: AsyncSession):
     try:
         await callback.message.edit_text(await OrderService(
             session, finished[page].id_services, finished[page].id_client, page, callback.from_user.id).
-                                         get_description_for_finished_worker(), reply_markup=await paginator_for_finished(
-            finished, 'WorkerMenu_', page, id_worker=callback.from_user.id
-        ))
+                                         get_description_for_finished_worker(),
+                                         reply_markup=
+                                         await get_keyboards(session=session, page=page, pref='finiteWRK',
+                                                             id_worker=callback.from_user.id, back='WorkerMenu_'))
     except IndexError:
         await callback.message.edit_text('Завершённых заказов пока нет.', reply_markup=get_inline_kb(
             btns={'Назад':'WorkerMenu_'}
         ))
 
 
-@worker_router.callback_query(PaginationFinishedWorker.filter())
-async def pagination_finished(callback: CallbackQuery, callback_data: PaginationFinishedWorker, session: AsyncSession):
+@worker_router.callback_query(Pagination.filter(F.pref == 'finiteWRK'))
+async def pagination_finished(callback: CallbackQuery, callback_data: Pagination, session: AsyncSession):
     finished = await orm_get_finished_for_worker(session, callback.from_user.id)
     page = callback_data.page
     await callback.message.edit_text(await OrderService(
         session, finished[page].id_services, finished[page].id_client, page, callback.from_user.id).
-                                     get_description_for_finished_worker(), reply_markup=await paginator_for_finished(
-        finished, 'WorkerMenu_', page, id_worker=callback.from_user.id
-    ))
+                                     get_description_for_finished_worker(),
+                                     reply_markup=
+                                     await get_keyboards(session=session, page=page, pref='finiteWRK',
+                                                         id_worker=callback.from_user.id, back='WorkerMenu_'))

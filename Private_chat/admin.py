@@ -4,8 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from Common.paginator import PaginationServices, paginator_services, PaginationClients, paginator_clients, \
-    paginator_workers, PaginationWorkers, paginator, Pagination
+from Common.paginator import Pagination, get_keyboards
 from DataBase.orm_query import orm_add_tos, orm_get_all_tos, orm_add_service, orm_get_contact_information_id, \
     orm_add_worker, orm_get_worker, orm_get_services, orm_get_service, orm_update_service, orm_delete_service, \
     orm_delete_tos, orm_get_workers, orm_get_clients, orm_delete_ci, orm_delete_client, orm_delete_worker
@@ -297,7 +296,10 @@ async def ns_name(message: types.Message, state: FSMContext, bot: Bot):
 async def ns_desc(message: types.Message, state: FSMContext, bot: Bot):
     await bot.delete_message(message.chat.id, message.message_id - 1)
     await message.delete()
-    await state.update_data(description=message.text.capitalize())
+    if message.text == '*' and NewService.updating is not None:
+        await state.update_data(description=NewService.updating.description)
+    else:
+        await state.update_data(description=message.text.capitalize())
     if NewService.updating == None:
         await message.answer(f'Вы ввели такое описание:\n{message.text.capitalize()}\n\nВведите стоимость услуги:')
     else:
@@ -473,45 +475,47 @@ async def type_of_serv(callback: types.CallbackQuery, session: AsyncSession):
 @admin_router.callback_query(F.data.startswith('admtos_'))
 async def start_pagination_services(callback: types.CallbackQuery, session: AsyncSession):
     tos_name = callback.data.split('_')[-1]
+    page = 0
     services = await orm_get_services(session, tos_name)
-    service = services[0]
+    service = services[page]
     await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price}',
                                      reply_markup=
-                                     await paginator_services(session=session, tos_name=tos_name, page=0, back='AdminMenu_',
-                                                     ))
+                                     await get_keyboards(session=session, pref='servADM', page=page,
+                                                         tos_name=tos_name, back='AdminMenu_'))
 
 
-@admin_router.callback_query(PaginationServices.filter())
-async def pagination_services(callback: types.CallbackQuery,callback_data: PaginationServices, session: AsyncSession):
+@admin_router.callback_query(Pagination.filter(F.pref == 'servADM'))
+async def pagination_services(callback: types.CallbackQuery,callback_data: Pagination, session: AsyncSession):
     tos_name = callback_data.tos_name
     page = callback_data.page
     services = await orm_get_services(session, tos_name)
     service = services[page]
     await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price}',
                                      reply_markup=
-                                     await paginator_services(session=session, tos_name=tos_name, page=page, back='AdminMenu_',
-                                                     ))
+                                     await get_keyboards(session=session, pref='servADM', page=page,
+                                                         tos_name=tos_name, back='AdminMenu_'))
 
 
 @admin_router.callback_query(F.data == 'workers_')
 async def start_pagination_workers(callback: types.CallbackQuery, session: AsyncSession):
     try:
         workers_id = await orm_get_workers(session)
-        worker_id = workers_id[0].id_contact_information
+        page = 0
+        worker_id = workers_id[page].id_contact_information
         worker = await orm_get_contact_information_id(session, worker_id)
         await callback.message.edit_text(f'ID: {worker.id} | tg://openmessage?user_id={worker.id}'
                                          f'\nИмя: {worker.firstName}\nФамилия: {worker.lastName}'
                                          f'\nОтчество: {worker.patronymic}\nНомер телефона: {worker.phoneNumber}\n'
-                                         f'Специальность: {workers_id[0].specialty}\nРазряд: {workers_id[0].grade}',
-                                         reply_markup=await paginator_workers(session=session, page=0,
-                                                                              back='AdminMenu_')
-                                         )
+                                         f'Специальность: {workers_id[page].specialty}\nРазряд: {workers_id[page].grade}',
+                                         reply_markup=
+                                         await get_keyboards(session=session, page=page, pref='workersADM',
+                                                             back='AdminMenu_'))
     except:
         await callback.message.edit_text('Исполнителей нет.', reply_markup=ADMIN_KB)
 
 
-@admin_router.callback_query(PaginationWorkers.filter())
-async def pagination_workers(callback: types.CallbackQuery, callback_data: PaginationWorkers,session: AsyncSession):
+@admin_router.callback_query(Pagination.filter(F.pref == 'workersADM'))
+async def pagination_workers(callback: types.CallbackQuery, callback_data: Pagination,session: AsyncSession):
     workers_id = await orm_get_workers(session)
     page = callback_data.page
     worker_id = workers_id[page].id_contact_information
@@ -520,29 +524,31 @@ async def pagination_workers(callback: types.CallbackQuery, callback_data: Pagin
                                      f'\nИмя: {worker.firstName}\nФамилия: {worker.lastName}'
                                      f'\nОтчество: {worker.patronymic}\nНомер телефона: {worker.phoneNumber}\n'
                                      f'Специальность: {workers_id[page].specialty}\nРазряд: {workers_id[page].grade}',
-                                     reply_markup=await paginator_workers(session=session, page=page,
-                                                                          back='AdminMenu_'))
+                                     reply_markup=
+                                     await get_keyboards(session=session, page=page, pref='workersADM',
+                                                         back='AdminMenu_'))
 
 
 @admin_router.callback_query(F.data == 'clients_')
 async def start_pagination_clients(callback: types.CallbackQuery, session: AsyncSession):
     clients_id = await orm_get_clients(session)
     try:
-        client_id = clients_id[0].id_contact_information
+        page = 0
+        client_id = clients_id[page].id_contact_information
         client = await orm_get_contact_information_id(session, client_id)
         await callback.message.edit_text(f'ID: {client.id} | tg://openmessage?user_id={client.id}\n'
                                          f'Имя: {client.firstName}\nФамилия: {client.lastName}\n'
                                          f'Отчество: {client.patronymic}\nНомер телефона: {client.phoneNumber}\n'
                                          f'Почта: {client.email}',
-                                         reply_markup=await paginator_clients(session=session, page=0,
-                                                                      back='AdminMenu_',
-                                                                      ))
+                                         reply_markup=
+                                         await get_keyboards(session=session, page=page, pref='clientsADM',
+                                                             back='AdminMenu_'))
     except:
         await callback.message.edit_text('Клиентов пока нет.', reply_markup=ADMIN_KB)
 
 
-@admin_router.callback_query(PaginationClients.filter())
-async def pagination_clients(callback: types.CallbackQuery, callback_data: PaginationClients, session: AsyncSession):
+@admin_router.callback_query(Pagination.filter(F.pref == 'clientsADM'))
+async def pagination_clients(callback: types.CallbackQuery, callback_data: Pagination, session: AsyncSession):
     clients_id = await orm_get_clients(session)
     page = int(callback_data.page)
     client_id = clients_id[page].id_contact_information
@@ -551,6 +557,6 @@ async def pagination_clients(callback: types.CallbackQuery, callback_data: Pagin
                                      f'Имя: {client.firstName}\nФамилия: {client.lastName}\n'
                                      f'Отчество: {client.patronymic}\nНомер телефона: {client.phoneNumber}\n'
                                      f'Почта: {client.email}',
-                                     reply_markup=await paginator_clients(session=session, page=page,
-                                                                  back='AdminMenu_',
-                                                                  ))
+                                     reply_markup=
+                                     await get_keyboards(session=session, page=page, pref='clientsADM',
+                                                         back='AdminMenu_'))
