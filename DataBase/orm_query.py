@@ -259,6 +259,12 @@ async def orm_get_finished_for_clients(session: AsyncSession, id_client: int):
     return result.scalars().all()
 
 
+async def orm_get_awaiting_one(session: AsyncSession, id_awaiting: int):
+    query = select(Awaiting).where(Awaiting.id == id_awaiting)
+    result = await session.execute(query)
+    return result.scalar()
+
+
 async def orm_delete_awaiting(session: AsyncSession, id_awaiting: int):
     query = delete(Awaiting).where(Awaiting.id == id_awaiting)
     await session.execute(query)
@@ -277,5 +283,26 @@ async def orm_add_feedback(session: AsyncSession, data: dict):
 
 async def orm_get_feedback(session: AsyncSession, id_awaiting: int):
     query = select(Feedback).where(Feedback.id_awaiting == id_awaiting)
+    result = await session.execute(query)
+    return result.scalar()
+
+
+async def orm_delete_feedback(session: AsyncSession, id_feedback):
+    query = delete(Feedback).where(Feedback.id == id_feedback)
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_update_feedback(session: AsyncSession, id_awaiting: int, data: dict):
+    query = update(Feedback).where(Feedback.id_awaiting == id_awaiting).values(
+        mark=data['mark'],
+        text=data['text']
+    )
+    await session.execute(query)
+    await session.commit()
+
+
+async def orm_get_feedback_one(session: AsyncSession, id_feedback: int):
+    query = select(Feedback).where(Feedback.id == id_feedback)
     result = await session.execute(query)
     return result.scalar()

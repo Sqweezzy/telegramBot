@@ -9,14 +9,14 @@ from aiogram.types import Message, KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from Common.client_inf import ClientInformation, OrderService
+from Common.client_inf import ClientInformation, OrderService, FeedbackDesc
 from Common.paginator import get_keyboards, Pagination
 from DataBase.orm_query import orm_add_contact_information, orm_add_client, \
     orm_update_ci_fn, orm_update_ci_sn, orm_update_ci_patr, orm_update_ci_mail, orm_update_ci_phone, orm_get_all_tos, \
     orm_get_services, orm_add_awaiting, orm_get_awaitings_for_client, orm_get_service, orm_get_finished_for_clients, \
-    orm_add_feedback
+    orm_add_feedback, orm_get_feedback, orm_delete_feedback, orm_get_feedback_one, orm_update_feedback
 from Filters.chat_type import ChatTypeFilter
-from Keyboards.inline import get_inline_kb, remove_keyboard
+from Keyboards.inline import get_inline_kb
 
 client_router = Router()
 client_router.message.filter(ChatTypeFilter(['private']))
@@ -42,7 +42,7 @@ MAINMENU_KB = get_inline_kb(
         'Мои данные': 'ReRegister_',
         'Услуги': 'Services_',
         'Мои заказы': 'MyOrders_',
-        'Оставить отзыв': 'Feedback_',
+        'Мои отзывы': 'MyFeedback_',
     }
 )
 
@@ -585,6 +585,8 @@ class FSMFeedback(StatesGroup):
     mark = State()
     text = State()
 
+    editinig = None
+
 MARK = get_inline_kb(btns={
 '⭐':'1',
 '⭐⭐':'2',
@@ -593,24 +595,35 @@ MARK = get_inline_kb(btns={
 '⭐⭐⭐⭐⭐':'5',},sizes=(1,))
 
 
-@client_router.callback_query(F.data.startswith('feedback_'), StateFilter(None))
-async def start_fsm_feedback(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(id_awaiting=callback.data.split('_')[-1])
-    await callback.message.edit_text('Оцените нашу работу:', reply_markup=MARK)
+@client_router.callback_query(or_f(F.data.startswith('feedback_'), F.data.startswith('editMyFeedback_')),
+                              StateFilter(None))
+async def start_fsm_feedback(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+    pref, id_awaiting = callback.data.split('_')
+    if pref == 'editMyFeedback':
+        FSMFeedback.editinig = await orm_get_feedback_one(session, int(id_awaiting))
+        await state.update_data(id_awaiting=FSMFeedback.editinig.id_awaiting)
+        await callback.message.edit_text('Оцените нашу работу:', reply_markup=MARK)
+    else:
+        await state.update_data(id_awaiting=id_awaiting)
+        await callback.message.edit_text('Оцените нашу работу:', reply_markup=MARK)
     await state.set_state(FSMFeedback.mark)
 
 
 @client_router.callback_query(FSMFeedback.mark)
 async def feedback_text(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(mark=int(callback.data))
-    await callback.message.edit_text('Напишите, что вам больше всего понравилось или то, чем вы недовольны.')
+    if FSMFeedback.editinig is not None:
+        await callback.message.edit_text(f'Ваш прошлый текст сообщения:\n{FSMFeedback.editinig.text}')
+    else:
+        await callback.message.edit_text('Напишите, что вам больше всего понравилось или то, чем вы недовольны.')
     await state.set_state(FSMFeedback.text)
 
 @client_router.message(FSMFeedback.mark)
 async def error(message: Message, bot: Bot):
     await bot.delete_message(message.chat.id, message.message_id - 1)
     await message.delete()
-    await message.answer('Выберите оценку ниже:',reply_markup=MARK)
+    await message.answer('Выберите оценку из кнопок ниже:',reply_markup=MARK)
+
 
 @client_router.message(FSMFeedback.text, F.text)
 async def feedback_last_state(message: Message, state: FSMContext, bot: Bot, session: AsyncSession):
@@ -618,10 +631,63 @@ async def feedback_last_state(message: Message, state: FSMContext, bot: Bot, ses
     await bot.delete_message(message.chat.id, message.message_id - 1)
     await message.delete()
     data = await state.get_data()
+    if FSMFeedback.editinig is not None:
+        try:
+            await orm_update_feedback(session=session, id_awaiting= FSMFeedback.editinig.id_awaiting, data=data)
+            await message.answer('Отзыв успешно изменён!\nЧто-то ещё?', reply_markup=MAINMENU_KB)
+            await state.clear()
+            FSMFeedback.editinig = None
+        except Exception as e:
+            await message.answer(f'Ошибка {e}', reply_markup=MAINMENU_KB)
+            await state.clear()
+            FSMFeedback.editinig = None
+    else:
+        try:
+            await orm_add_feedback(session, data)
+            await message.answer('Отзыв успешно отправлен!\nЧто-то ещё?', reply_markup=MAINMENU_KB)
+            await state.clear()
+        except Exception as e:
+            await message.answer(f'Ошибка\n{e}', reply_markup=MAINMENU_KB)
+            await state.clear()
+
+
+@client_router.callback_query(F.data == 'MyFeedback_')
+async def my_feedback(callback: types.CallbackQuery, session: AsyncSession):
+    page = 0
+    awaitings = await orm_get_finished_for_clients(session, callback.from_user.id)
+    feedbacks = []
+    i = page
+    while i != len(awaitings):
+        if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(await orm_get_feedback(session, awaitings[i].id))
+        i+= 1
+    feedback = feedbacks[page]
+    print(len(feedbacks))
+    await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_client(),
+                                     reply_markup=await get_keyboards(session=session, pref='feedBackUS',page=page,
+                                                                      array_feedback=feedbacks, back='MainMenu_'))
+
+@client_router.callback_query(Pagination.filter(F.pref == 'feedBackUS'))
+async def pagination_feedback_user(callback: types.CallbackQuery, callback_data: Pagination, session: AsyncSession):
+    page = callback_data.page
+    awaitings = await orm_get_finished_for_clients(session, callback.from_user.id)
+    feedbacks = []
+    i = page
+    while i != len(awaitings):
+        if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(
+            await orm_get_feedback(session, awaitings[i].id))
+        i += 1
+    feedback = feedbacks[page]
+    await callback.message.edit_text(
+        await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_client(),
+        reply_markup=await get_keyboards(session=session, pref='feedBackUS', page=page,
+                                         array_feedback=feedbacks, back='MainMenu_'))
+
+
+@client_router.callback_query(F.data.startswith('deleteMyFeedback_'))
+async def delete_feedback(callback: types.CallbackQuery, session: AsyncSession):
     try:
-        await orm_add_feedback(session, data)
-        await message.answer('Отзыв успешно отправлен!\nЧто-то ещё?', reply_markup=MAINMENU_KB)
-        await state.clear()
+        await orm_delete_feedback(session, callback.data.split('_')[-1])
+        await callback.message.edit_text(f'Отзыв успешно удален.\n\nЧто хотите сделать?', reply_markup=MAINMENU_KB)
     except Exception as e:
-        await message.answer(f'Ошибка\n{e}', reply_markup=MAINMENU_KB)
-        await state.clear()
+        await callback.message.edit_text(f'Ошибка {e}', reply_markup=MAINMENU_KB)
+

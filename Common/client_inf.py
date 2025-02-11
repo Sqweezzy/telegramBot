@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from DataBase.orm_query import orm_get_contact_information_id, orm_get_service, orm_get_all_awaitings, \
     orm_get_awaitings_for_client, orm_get_awaitings_for_worker, orm_get_finished_for_worker, \
-    orm_get_finished_for_clients
+    orm_get_finished_for_clients, orm_get_feedback_one, orm_get_awaiting_one
 
 
 class ClientInformation:
@@ -64,3 +64,17 @@ class OrderService:
         orders = await orm_get_finished_for_clients(self.session, self.id_client)
         client = await orm_get_contact_information_id(self.session, self.id_client)
         return f'Услуга - {service.name}\n\n{service.description}\n\nСтоимость - {service.price} руб.\nЗаказано - {orders[self.page].created} {client.id} | tg://openmessage?user_id={client.id}\nИмя: {client.firstName}\nФамилия: {client.lastName}\nНомер телефона: {client.phoneNumber}\nСтатус - {orders[self.page].status}'
+
+
+class FeedbackDesc:
+    def __init__(self, session: AsyncSession, page: int, id_feedback: int):
+        self.session = session
+        self.id_feedback = id_feedback
+        self.page = page
+
+    async def get_desc_for_client(self):
+        feedback = await orm_get_feedback_one(self.session, self.id_feedback)
+        awaiting = await orm_get_awaiting_one(self.session, feedback.id_awaiting)
+        ci_worker = await orm_get_contact_information_id(self.session, awaiting.id_workers)
+        service = await orm_get_service(self.session, awaiting.id_services)
+        return f'Отзыв на услугу от {awaiting.updated}\n\nВыполнил {ci_worker.firstName} {ci_worker.lastName} | {ci_worker.phoneNumber}\n\n Услуга {service.name}\n{service.description}\n{service.price} руб.\n\nОценка: {feedback.mark}\nТекст отзыва:\n{feedback.text}'

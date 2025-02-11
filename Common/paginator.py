@@ -23,7 +23,8 @@ async def get_keyboards(
         id_worker: int = None,
         tos_name: str = None,
         back: str = None,
-        id_client: int = None):
+        id_client: int = None,
+        array_feedback: list = None):
     builder = InlineKeyboardBuilder()
 
     if pref == 'servUS':
@@ -84,7 +85,13 @@ async def get_keyboards(
         array = await orm_get_finished_for_worker(session, id_worker)
         pag_btns = paginator(array=array, page=page, pref=pref, id_worker=id_worker)
         builder.row(*pag_btns)
-
+    elif pref == 'feedBackUS':
+        array = array_feedback
+        row_btns =[InlineKeyboardButton(text='Изменить', callback_data=f'editMyFeedback_{array[page].id}'),
+                   InlineKeyboardButton(text='Удалить', callback_data=f'deleteMyFeedback_{array[page].id}')]
+        pag_btns = paginator(array=array, page=page, pref=pref)
+        builder.row(*row_btns)
+        builder.row(*pag_btns)
     if back is not None:
         builder.row(InlineKeyboardButton(text='Назад', callback_data=back))
 

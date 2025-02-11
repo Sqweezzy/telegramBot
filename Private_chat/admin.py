@@ -280,7 +280,7 @@ async def ns_ntos(callback: types.CallbackQuery, state: FSMContext):
 async def ns_name(message: types.Message, state: FSMContext, bot: Bot):
     await bot.delete_message(message.chat.id, message.message_id - 1)
     await message.delete()
-    if message.text == '*':
+    if message.text == '*' and NewService.updating is not None:
         await state.update_data(name=NewService.updating.name)
     else:
         await state.update_data(name=message.text.capitalize())
