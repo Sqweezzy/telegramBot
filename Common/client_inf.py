@@ -78,3 +78,18 @@ class FeedbackDesc:
         ci_worker = await orm_get_contact_information_id(self.session, awaiting.id_workers)
         service = await orm_get_service(self.session, awaiting.id_services)
         return f'Отзыв на услугу от {awaiting.updated}\n\nВыполнил {ci_worker.firstName} {ci_worker.lastName} | {ci_worker.phoneNumber}\n\n Услуга {service.name}\n{service.description}\n{service.price} руб.\n\nОценка: {feedback.mark}\nТекст отзыва:\n{feedback.text}'
+
+    async def get_desc_for_worker(self):
+        feedback = await orm_get_feedback_one(self.session, self.id_feedback)
+        awaiting = await orm_get_awaiting_one(self.session, feedback.id_awaiting)
+        ci_client = await orm_get_contact_information_id(self.session, awaiting.id_client)
+        service = await orm_get_service(self.session, awaiting.id_services)
+        return f'Отзыв на услугу от {awaiting.updated}\n\nКлиент {ci_client.firstName} {ci_client.lastName} | {ci_client.phoneNumber}\n\n Услуга {service.name}\n{service.description}\n{service.price} руб.\n\nОценка: {feedback.mark}\nТекст отзыва:\n{feedback.text}'
+
+    async def get_desc_for_admin(self):
+        feedback = await orm_get_feedback_one(self.session, self.id_feedback)
+        awaiting = await orm_get_awaiting_one(self.session, feedback.id_awaiting)
+        ci_worker = await orm_get_contact_information_id(self.session, awaiting.id_workers)
+        ci_client = await orm_get_contact_information_id(self.session, awaiting.id_client)
+        service = await orm_get_service(self.session, awaiting.id_services)
+        return f'Отзыв на услугу от {awaiting.updated}\n\nКлиент {ci_client.firstName} {ci_client.lastName} | {ci_client.phoneNumber}\nИсполнитель {ci_worker.firstName} {ci_worker.lastName} | {ci_worker.phoneNumber}\n\n Услуга {service.name}\n{service.description}\n{service.price} руб.\n\nОценка: {feedback.mark}\nТекст отзыва:\n{feedback.text}'

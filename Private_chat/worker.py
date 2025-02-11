@@ -3,10 +3,10 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from Common.client_inf import OrderService
+from Common.client_inf import OrderService, FeedbackDesc
 from Common.paginator import Pagination, get_keyboards
 from DataBase.orm_query import orm_get_all_awaitings, orm_update_awaiting, orm_get_awaitings_for_worker, \
-    orm_finish_order, orm_get_finished_for_worker
+    orm_finish_order, orm_get_finished_for_worker, orm_get_feedback
 from Filters.chat_type import IsWorker, ChatTypeFilter
 from Keyboards.inline import get_inline_kb
 
@@ -17,6 +17,7 @@ worker_router.message.filter(IsWorker())
 WORKER_KB = get_inline_kb(btns={
     'Заказы':'orders_',
     'Мои заказы':'yourOrders_',
+    'Отзывы':'myFeedback'
 })
 
 
@@ -140,3 +141,37 @@ async def pagination_finished(callback: CallbackQuery, callback_data: Pagination
                                      reply_markup=
                                      await get_keyboards(session=session, page=page, pref='finiteWRK',
                                                          id_worker=callback.from_user.id, back='WorkerMenu_'))
+
+
+@worker_router.callback_query(F.data == 'myFeedback')
+async def my_feedbacks(callback: CallbackQuery, session: AsyncSession):
+    page = 0
+    awaitings = await orm_get_finished_for_worker(session, callback.from_user.id)
+    feedbacks = []
+    i = page
+    while i != len(awaitings):
+        if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(
+            await orm_get_feedback(session, awaitings[i].id))
+        i += 1
+    feedback = feedbacks[page]
+    await callback.message.edit_text(
+        await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_worker(),
+        reply_markup=await get_keyboards(session=session, pref='feedBackWRK', page=page,
+                                         array_feedback=feedbacks, back='WorkerMenu_'))
+
+
+@worker_router.callback_query(Pagination.filter(F.pref == 'feedBackWRK'))
+async def pagination_my_feedbacks(callback: CallbackQuery, callback_data: Pagination, session: AsyncSession):
+    page = callback_data.page
+    awaitings = await orm_get_finished_for_worker(session, callback.from_user.id)
+    feedbacks = []
+    i = page
+    while i != len(awaitings):
+        if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(
+            await orm_get_feedback(session, awaitings[i].id))
+        i += 1
+    feedback = feedbacks[page]
+    await callback.message.edit_text(
+        await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_worker(),
+        reply_markup=await get_keyboards(session=session, pref='feedBackWRK', page=page,
+                                         array_feedback=feedbacks, back='WorkerMenu_'))

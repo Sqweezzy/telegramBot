@@ -29,69 +29,64 @@ async def get_keyboards(
 
     if pref == 'servUS':
         array = await orm_get_services(session, tos_name)
-        pag_btns = paginator(array=array, page=page, pref=pref, tos_name=tos_name)
         builder.row(InlineKeyboardButton(text='Заказать',
                                          callback_data=f'toOrder_{array[page].id}'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, tos_name=tos_name))
     elif pref == 'ordersUS':
         array = await orm_get_awaitings_for_client(session, id_client)
-        pag_btns = paginator(array=array, page=page, pref=pref, id_client=id_client)
         builder.row(InlineKeyboardButton(text='Завершенные заказы',
                                          callback_data='UserFinished_'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, id_client=id_client))
     elif pref == 'finiteUS':
         array = await orm_get_finished_for_clients(session, id_client)
-        pag_btns = paginator(array=array, page=page, pref=pref, id_client=id_client)
         if await orm_get_feedback(session, array[page].id) is None:
             builder.row(InlineKeyboardButton(text='Оставить отзыв',
                                              callback_data=f'feedback_{array[page].id}'))
         else:
             builder.row(InlineKeyboardButton(text='Вы уже оставили отзыв', callback_data='null'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, id_client=id_client))
     elif pref == 'servADM':
         array = await orm_get_services(session, tos_name)
-        pag_btns = paginator(array=array, page=page, pref=pref, tos_name=tos_name)
         adm_btns = [InlineKeyboardButton(text='Изменить', callback_data=f'update_{array[page].id}'),
                     InlineKeyboardButton(text='Удалить', callback_data=f'delete_{array[page].id}')
                     ]
         builder.row(*adm_btns)
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, tos_name=tos_name))
     elif pref == 'workersADM':
         array = await orm_get_workers(session)
-        pag_btns = paginator(array=array, page=page, pref=pref)
         builder.row(InlineKeyboardButton(text='Удалить',
                                          callback_data=f'cidelete_{array[page].id_contact_information}'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref))
     elif pref == 'clientsADM':
         array = await orm_get_clients(session)
-        pag_btns = paginator(array=array, page=page, pref=pref)
         builder.row(InlineKeyboardButton(text='Удалить',
                                          callback_data=f'cidelete_{array[page].id_contact_information}'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref))
     elif pref == 'ordersWRK':
         array = await orm_get_all_awaitings(session)
-        pag_btns = paginator(array=array, page=page, pref=pref)
         builder.row(InlineKeyboardButton(text='Взять заказ', callback_data=f'takeOrder_{array[page].id}'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref))
     elif pref == 'yourOrderWRK':
         array = await orm_get_awaitings_for_worker(session=session, id_worker=id_worker)
-        pag_btns = paginator(array=array, page=page, pref=pref, id_worker=id_worker)
         builder.row(InlineKeyboardButton(text='Завершить заказ',
                                          callback_data=f'changeStatus_{array[page].id}'))
         builder.row(InlineKeyboardButton(text='Завершённые заказы',
                                          callback_data='workerFinished_'))
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, id_worker=id_worker))
     elif pref == 'finiteWRK':
         array = await orm_get_finished_for_worker(session, id_worker)
-        pag_btns = paginator(array=array, page=page, pref=pref, id_worker=id_worker)
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref, id_worker=id_worker))
     elif pref == 'feedBackUS':
         array = array_feedback
         row_btns =[InlineKeyboardButton(text='Изменить', callback_data=f'editMyFeedback_{array[page].id}'),
                    InlineKeyboardButton(text='Удалить', callback_data=f'deleteMyFeedback_{array[page].id}')]
-        pag_btns = paginator(array=array, page=page, pref=pref)
         builder.row(*row_btns)
-        builder.row(*pag_btns)
+        builder.row(*paginator(array=array, page=page, pref=pref))
+    elif pref == 'feedBackWRK':
+        builder.row(*paginator(array=array_feedback, page=page, pref=pref))
+    elif pref == 'feedBackADM':
+        builder.row(*paginator(array=array_feedback, page=page, pref=pref))
+
     if back is not None:
         builder.row(InlineKeyboardButton(text='Назад', callback_data=back))
 

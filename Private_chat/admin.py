@@ -2,12 +2,16 @@ from aiogram import Router, types, Bot, F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from Common.client_inf import FeedbackDesc
 from Common.paginator import Pagination, get_keyboards
+from DataBase.models import Feedback
 from DataBase.orm_query import orm_add_tos, orm_get_all_tos, orm_add_service, orm_get_contact_information_id, \
     orm_add_worker, orm_get_worker, orm_get_services, orm_get_service, orm_update_service, orm_delete_service, \
-    orm_delete_tos, orm_get_workers, orm_get_clients, orm_delete_ci, orm_delete_client, orm_delete_worker
+    orm_delete_tos, orm_get_workers, orm_get_clients, orm_delete_ci, orm_delete_client, orm_delete_worker, \
+    orm_get_feedbacks
 from Filters.chat_type import ChatTypeFilter, IsAdmin
 from Keyboards.inline import get_inline_kb
 
@@ -43,6 +47,7 @@ ADMIN_KB = get_inline_kb(
         'Клиенты': 'clients_',
         'Добавить услугу': 'AddService_',
         'Добавить исполнителя': 'AddWorker_',
+        'Отзывы':'allFeedback'
     },
     sizes=(3, 2),
 )
@@ -560,3 +565,23 @@ async def pagination_clients(callback: types.CallbackQuery, callback_data: Pagin
                                      reply_markup=
                                      await get_keyboards(session=session, page=page, pref='clientsADM',
                                                          back='AdminMenu_'))
+
+
+@admin_router.callback_query(F.data == 'allFeedback')
+async def all_feedback(callback: CallbackQuery, session: AsyncSession):
+    feedbacks = await orm_get_feedbacks(session)
+    page = 0
+    await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedbacks[page].id)
+                                     .get_desc_for_admin(),
+                                     reply_markup= await get_keyboards(session=session, pref='feedBackADM', page=page,
+                                                                       array_feedback=feedbacks, back='AdminMenu_'))
+
+
+@admin_router.callback_query(Pagination.filter(F.pref == 'feedBackADM'))
+async def pagination_all_feedback(callback: CallbackQuery, callback_data: Pagination, session: AsyncSession):
+    feedbacks = await orm_get_feedbacks(session)
+    page = callback_data.page
+    await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedbacks[page].id)
+                                     .get_desc_for_admin(),
+                                     reply_markup=await get_keyboards(session=session, pref='feedBackADM', page=page,
+                                                                      array_feedback=feedbacks, back='AdminMenu_'))

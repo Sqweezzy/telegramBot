@@ -661,7 +661,6 @@ async def my_feedback(callback: types.CallbackQuery, session: AsyncSession):
         if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(await orm_get_feedback(session, awaitings[i].id))
         i+= 1
     feedback = feedbacks[page]
-    print(len(feedbacks))
     await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_client(),
                                      reply_markup=await get_keyboards(session=session, pref='feedBackUS',page=page,
                                                                       array_feedback=feedbacks, back='MainMenu_'))

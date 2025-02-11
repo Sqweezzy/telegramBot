@@ -301,6 +301,11 @@ async def orm_update_feedback(session: AsyncSession, id_awaiting: int, data: dic
     await session.execute(query)
     await session.commit()
 
+async def orm_get_feedbacks(session: AsyncSession):
+    query = select(Feedback)
+    result = await session.execute(query)
+    return result.scalars().all()
+
 
 async def orm_get_feedback_one(session: AsyncSession, id_feedback: int):
     query = select(Feedback).where(Feedback.id == id_feedback)
