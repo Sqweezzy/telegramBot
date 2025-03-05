@@ -153,11 +153,14 @@ async def my_feedbacks(callback: CallbackQuery, session: AsyncSession):
         if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(
             await orm_get_feedback(session, awaitings[i].id))
         i += 1
-    feedback = feedbacks[page]
-    await callback.message.edit_text(
-        await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_worker(),
-        reply_markup=await get_keyboards(session=session, pref='feedBackWRK', page=page,
-                                         array_feedback=feedbacks, back='WorkerMenu_'))
+    try:
+        feedback = feedbacks[page]
+        await callback.message.edit_text(
+            await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_worker(),
+            reply_markup=await get_keyboards(session=session, pref='feedBackWRK', page=page,
+                                             array_feedback=feedbacks, back='WorkerMenu_'))
+    except IndexError:
+        await callback.message.edit_text('Отзывов пока нет.', reply_markup=WORKER_KB)
 
 
 @worker_router.callback_query(Pagination.filter(F.pref == 'feedBackWRK'))

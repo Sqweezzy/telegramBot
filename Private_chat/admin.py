@@ -396,8 +396,8 @@ async def nw_id(message: types.Message, state: FSMContext, bot: Bot, session: As
         await message.answer('Исполнитель с таким ID уже есть, напишите другой ID или отмените действие.')
     else:
         await state.update_data(id=message.text)
-        await message.answer(f'Вы ввели - {message.text}\nЕго имя:{user.firstName}\nФамилия:{user.lastName}\n'
-                             f'Отчество:{user.patronymic}\n\nНапишите специальность исполнителя: ')
+        await message.answer(f'Вы ввели - {message.text}\nЕго имя: {user.firstName}\nФамилия: {user.lastName}\n'
+                             f'Отчество: {user.patronymic}\n\nНапишите специальность исполнителя: ')
         await state.set_state(NewWorker.specialty)
 
 
@@ -483,7 +483,7 @@ async def start_pagination_services(callback: types.CallbackQuery, session: Asyn
     page = 0
     services = await orm_get_services(session, tos_name)
     service = services[page]
-    await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price}',
+    await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price} руб.',
                                      reply_markup=
                                      await get_keyboards(session=session, pref='servADM', page=page,
                                                          tos_name=tos_name, back='AdminMenu_'))
@@ -495,7 +495,7 @@ async def pagination_services(callback: types.CallbackQuery,callback_data: Pagin
     page = callback_data.page
     services = await orm_get_services(session, tos_name)
     service = services[page]
-    await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price}',
+    await callback.message.edit_text(f'{service.name}\n\n{service.description}\n\n{service.price} руб.',
                                      reply_markup=
                                      await get_keyboards(session=session, pref='servADM', page=page,
                                                          tos_name=tos_name, back='AdminMenu_'))
@@ -571,11 +571,13 @@ async def pagination_clients(callback: types.CallbackQuery, callback_data: Pagin
 async def all_feedback(callback: CallbackQuery, session: AsyncSession):
     feedbacks = await orm_get_feedbacks(session)
     page = 0
-    await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedbacks[page].id)
-                                     .get_desc_for_admin(),
-                                     reply_markup= await get_keyboards(session=session, pref='feedBackADM', page=page,
-                                                                       array_feedback=feedbacks, back='AdminMenu_'))
-
+    try:
+        await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedbacks[page].id)
+                                         .get_desc_for_admin(),
+                                         reply_markup= await get_keyboards(session=session, pref='feedBackADM', page=page,
+                                                                           array_feedback=feedbacks, back='AdminMenu_'))
+    except IndexError:
+        await callback.message.edit_text('Отзывов пока нет.', reply_markup=ADMIN_KB)
 
 @admin_router.callback_query(Pagination.filter(F.pref == 'feedBackADM'))
 async def pagination_all_feedback(callback: CallbackQuery, callback_data: Pagination, session: AsyncSession):

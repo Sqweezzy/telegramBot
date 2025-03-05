@@ -564,7 +564,7 @@ async def finished_orders_user(callback: types.CallbackQuery, session: AsyncSess
                             id_client=callback.from_user.id, back='MainMenu_'))
     except IndexError:
         await callback.message.edit_text('Заказов пока нет.', reply_markup=get_inline_kb(
-            btns={'Назад':'MainMenu'}
+            btns={'Назад':'MainMenu_'}
         ))
 
 
@@ -660,10 +660,14 @@ async def my_feedback(callback: types.CallbackQuery, session: AsyncSession):
     while i != len(awaitings):
         if await orm_get_feedback(session, awaitings[i].id) is not None: feedbacks.append(await orm_get_feedback(session, awaitings[i].id))
         i+= 1
-    feedback = feedbacks[page]
-    await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_client(),
-                                     reply_markup=await get_keyboards(session=session, pref='feedBackUS',page=page,
-                                                                      array_feedback=feedbacks, back='MainMenu_'))
+    try:
+        feedback = feedbacks[page]
+        await callback.message.edit_text(await FeedbackDesc(session=session, page=page, id_feedback=feedback.id).get_desc_for_client(),
+                                         reply_markup=await get_keyboards(session=session, pref='feedBackUS',page=page,
+                                                                          array_feedback=feedbacks, back='MainMenu_'))
+    except IndexError:
+        await callback.message.edit_text('Вы ещё не оставляли отзывы', reply_markup=MAINMENU_KB)
+
 
 @client_router.callback_query(Pagination.filter(F.pref == 'feedBackUS'))
 async def pagination_feedback_user(callback: types.CallbackQuery, callback_data: Pagination, session: AsyncSession):
